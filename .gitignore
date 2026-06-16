@@ -44,3 +44,4 @@ context_audio.wav
 *.pt
 *.ckpt
 *.safetensors
+cloudflared

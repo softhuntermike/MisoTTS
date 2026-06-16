@@ -315,6 +315,7 @@
   <span style="font-size:1.4rem">🚌</span>
   <h1>BusMap Hà Nội</h1>
   <span class="badge">Test UI</span>
+  <span id="proxy-badge" style="display:none;font-size:.7rem;background:#fef3c7;color:#92400e;border-radius:99px;padding:2px 8px;font-weight:700;">via proxy</span>
 </header>
 
 <div class="container">
@@ -324,7 +325,7 @@
     <summary>Cấu hình API</summary>
     <div class="settings-grid">
       <div>
-        <label for="cfg-base">API Base URL</label>
+        <label for="cfg-base">API Base URL <span style="font-weight:400;color:var(--green)">(trống = dùng proxy cục bộ)</span></label>
         <input id="cfg-base" value="https://api.busmap.vn" placeholder="https://api.busmap.vn">
       </div>
       <div>
@@ -345,8 +346,9 @@
       </div>
       <div></div>
       <p class="settings-hint">
-        ⚠️ Nếu bị lỗi CORS khi mở file trực tiếp, hãy dùng CORS proxy
-        (<code>https://corsproxy.io/?</code>) hoặc bật Mock Data bên dưới để test giao diện.
+        ✅ Tự động thử kết nối trực tiếp trước. Nếu bị CORS, tự động chuyển qua
+        <code>corsproxy.io</code> — badge <strong>"via proxy"</strong> sẽ hiện trên header.
+        Không cần cấu hình thêm gì.
       </p>
     </div>
   </details>
@@ -501,6 +503,9 @@ function mockTrackerData(stopId) {
 /* ─────────────────────────────────────────────
    HELPERS
 ───────────────────────────────────────────── */
+const CORS_PROXY = "https://corsproxy.io/?";
+let usingProxy   = false;   // tracks whether the last successful call used the proxy
+
 function cfg(id) { return document.getElementById(id).value.trim(); }
 function isMock() { return document.getElementById("mock-toggle").checked; }
 
@@ -510,17 +515,41 @@ function buildUrl(templateOrPath, vars = {}) {
   for (const [k, v] of Object.entries(vars)) {
     path = path.replace(`{${k}}`, encodeURIComponent(v));
   }
-  // add direction as query param if needed
   return base + path;
 }
 
+function setProxyBadge(active) {
+  const badge = document.getElementById("proxy-badge");
+  if (!badge) return;
+  badge.style.display = active ? "" : "none";
+}
+
 async function apiFetch(url) {
-  const headers = { "Accept": "application/json" };
   const key = cfg("cfg-key");
+  const headers = { "Accept": "application/json" };
   if (key) headers["Authorization"] = `Bearer ${key}`;
-  const resp = await fetch(url, { headers });
-  if (!resp.ok) throw new Error(`HTTP ${resp.status} ${resp.statusText}`);
-  return resp.json();
+
+  // 1st attempt: direct
+  try {
+    const resp = await fetch(url, { headers });
+    if (!resp.ok) throw new Error(`HTTP ${resp.status} ${resp.statusText}`);
+    usingProxy = false;
+    setProxyBadge(false);
+    return resp.json();
+  } catch (directErr) {
+    const isCors = directErr.message === "Failed to fetch"
+                || directErr.name === "TypeError";
+    if (!isCors) throw directErr;           // real HTTP error, don't retry
+  }
+
+  // 2nd attempt: via CORS proxy
+  console.info("Direct fetch failed (CORS?), retrying via corsproxy.io…");
+  const proxyUrl = CORS_PROXY + encodeURIComponent(url);
+  const resp2 = await fetch(proxyUrl, { headers });
+  if (!resp2.ok) throw new Error(`HTTP ${resp2.status} via corsproxy.io`);
+  usingProxy = true;
+  setProxyBadge(true);
+  return resp2.json();
 }
 
 function parseRoutes(json) {
