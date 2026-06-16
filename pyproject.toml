@@ -23,4 +23,4 @@ dependencies = [
 ]
 
 [tool.setuptools]
-py-modules = ["generator", "models", "moshi_compat", "run_misotts", "watermarking"]
+py-modules = ["generator", "models", "moshi_compat", "run_misotts", "watermarking", "hanoi_bus", "bus_announcement"]
