@@ -1,0 +1,130 @@
+name: BusMap Live Test
+
+on:
+  workflow_dispatch:
+    inputs:
+      route_id:
+        description: 'Route ID (e.g. 49)'
+        required: true
+        default: '49'
+      direction:
+        description: 'Direction: 1=lượt đi  2=lượt về'
+        required: true
+        default: '2'
+      stop_name:
+        description: 'Stop name to search (partial match OK)'
+        required: true
+        default: 'Trần Hữu Dực'
+
+jobs:
+  busmap-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/hanoi-bus-info-integration-hzlizt
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install deps
+        run: pip install requests
+
+      - name: Run BusMap test
+        env:
+          ROUTE_ID:   ${{ github.event.inputs.route_id }}
+          DIRECTION:  ${{ github.event.inputs.direction }}
+          STOP_NAME:  ${{ github.event.inputs.stop_name }}
+        run: |
+          python - <<'PYEOF'
+          import os, json, sys
+          import requests
+
+          BASE     = "https://api.busmap.vn"
+          ROUTE_ID = os.environ["ROUTE_ID"]
+          DIR      = int(os.environ["DIRECTION"])
+          KEYWORD  = os.environ["STOP_NAME"].lower()
+          HEADERS  = {"Accept": "application/json",
+                      "User-Agent": "Mozilla/5.0 (Android 13; Mobile) AppleWebKit/537.36"}
+
+          def jprint(label, data):
+              print(f"\n{'='*60}")
+              print(f"  {label}")
+              print(f"{'='*60}")
+              print(json.dumps(data, ensure_ascii=False, indent=2))
+
+          # -- 1. Fetch routes --
+          print("\n[1] Fetching route list...")
+          url = f"{BASE}/api/v1/routes"
+          r = requests.get(url, headers=HEADERS, timeout=15)
+          print(f"    GET {url}  ->  HTTP {r.status_code}")
+          if r.ok:
+              data = r.json()
+              arr  = data.get("data") or data.get("result") or data.get("routes") or data
+              if isinstance(arr, list):
+                  match = [x for x in arr if str(x.get("id") or x.get("routeId") or "") == ROUTE_ID]
+                  print(f"    Route {ROUTE_ID} entry: {json.dumps(match[:1], ensure_ascii=False)}")
+          else:
+              print(f"    Response: {r.text[:400]}")
+
+          # -- 2. Fetch stops --
+          print(f"\n[2] Fetching stops for route {ROUTE_ID}, direction {DIR}...")
+          stop_id   = None
+          stop_name = None
+
+          candidates = [
+              f"{BASE}/api/v1/routes/{ROUTE_ID}/stops?direction={DIR}",
+              f"{BASE}/api/v1/routes/{ROUTE_ID}/stops/{DIR}",
+              f"{BASE}/api/v1/stops?routeId={ROUTE_ID}&direction={DIR}",
+              f"{BASE}/api/v1/route/{ROUTE_ID}/stops?direction={DIR}",
+          ]
+
+          for url in candidates:
+              r = requests.get(url, headers=HEADERS, timeout=15)
+              print(f"    GET {url}  ->  HTTP {r.status_code}")
+              if r.ok:
+                  data = r.json()
+                  jprint(f"Stops ({url})", data)
+                  arr = data.get("data") or data.get("result") or data.get("stops") or data.get("items") or []
+                  if not isinstance(arr, list): arr = []
+                  for s in arr:
+                      name = (s.get("name") or s.get("stopName") or s.get("tenTram") or "").lower()
+                      if KEYWORD in name:
+                          stop_id   = str(s.get("id") or s.get("stopId") or s.get("tramId") or "")
+                          stop_name = s.get("name") or s.get("stopName") or s.get("tenTram")
+                          print(f"\n    FOUND: '{stop_name}'  id={stop_id}")
+                          break
+                  if stop_id:
+                      break
+                  names = [(s.get("name") or s.get("stopName") or s.get("tenTram", "")) for s in arr[:15]]
+                  print(f"    First 15 stops: {names}")
+                  break
+              elif r.status_code == 404:
+                  continue
+              else:
+                  print(f"    Body: {r.text[:300]}")
+                  break
+
+          if not stop_id:
+              print("\n  Stop not found -- probing tracker with sample IDs...")
+              for pid in ["3002", "100", "200", "1", "50"]:
+                  url = f"{BASE}/api/v1/trackers/route/stops/{pid}"
+                  r   = requests.get(url, headers=HEADERS, timeout=15)
+                  print(f"    GET {url}  ->  HTTP {r.status_code}")
+                  if r.ok:
+                      jprint(f"Sample tracker stopId={pid}", r.json())
+                      break
+                  print(f"    Body: {r.text[:200]}")
+
+          # -- 3. Fetch tracker --
+          if stop_id:
+              print(f"\n[3] Real-time tracker for '{stop_name}' (id={stop_id})...")
+              url = f"{BASE}/api/v1/trackers/route/stops/{stop_id}"
+              r   = requests.get(url, headers=HEADERS, timeout=15)
+              print(f"    GET {url}  ->  HTTP {r.status_code}")
+              if r.ok:
+                  jprint(f"TRACKER -- {stop_name}", r.json())
+              else:
+                  print(f"    Error: {r.text[:400]}")
+          PYEOF
