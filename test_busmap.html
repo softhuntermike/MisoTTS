@@ -1,0 +1,816 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BusMap Hà Nội – Test</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --green:      #1db954;
+      --green-dark: #179b48;
+      --green-bg:   #e8f8ee;
+      --gray:       #f5f5f5;
+      --border:     #dde3e0;
+      --text:       #1a1a1a;
+      --muted:      #6b7280;
+      --card-bg:    #ffffff;
+      --red:        #e53e3e;
+      --yellow:     #f6ad55;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: var(--gray);
+      color: var(--text);
+      min-height: 100vh;
+    }
+
+    /* ── Header ── */
+    header {
+      background: var(--green);
+      color: #fff;
+      padding: 14px 20px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      box-shadow: 0 2px 8px rgba(0,0,0,.18);
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+    header h1 { font-size: 1.1rem; font-weight: 700; flex: 1; }
+    header .badge {
+      font-size: .7rem;
+      background: rgba(255,255,255,.25);
+      border-radius: 99px;
+      padding: 2px 8px;
+      letter-spacing: .04em;
+    }
+
+    /* ── Layout ── */
+    .container { max-width: 680px; margin: 0 auto; padding: 16px; }
+
+    /* ── Settings panel ── */
+    details.settings {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 12px 14px;
+      margin-bottom: 14px;
+      font-size: .85rem;
+    }
+    details.settings summary {
+      cursor: pointer;
+      font-weight: 600;
+      color: var(--green-dark);
+      list-style: none;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    details.settings summary::before { content: "⚙️"; }
+    .settings-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin-top: 10px;
+    }
+    .settings-grid label { color: var(--muted); font-size: .78rem; display: block; margin-bottom: 2px; }
+    .settings-grid input {
+      width: 100%; padding: 5px 8px;
+      border: 1px solid var(--border); border-radius: 6px;
+      font-size: .82rem;
+    }
+    .settings-grid input:focus { outline: none; border-color: var(--green); }
+    .settings-hint {
+      margin-top: 8px; font-size: .75rem; color: var(--muted);
+      grid-column: 1/-1;
+      background: #fffbeb;
+      border: 1px solid #fde68a;
+      border-radius: 6px;
+      padding: 6px 8px;
+    }
+
+    /* ── Selector card ── */
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 14px;
+      margin-bottom: 12px;
+    }
+    .card h2 {
+      font-size: .82rem;
+      font-weight: 700;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: .06em;
+      margin-bottom: 8px;
+    }
+
+    select {
+      width: 100%;
+      padding: 10px 12px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      font-size: .95rem;
+      background: #fff;
+      color: var(--text);
+      appearance: none;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M0 0l6 8 6-8z' fill='%236b7280'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 12px center;
+      cursor: pointer;
+    }
+    select:focus { outline: none; border-color: var(--green); box-shadow: 0 0 0 2px rgba(29,185,84,.2); }
+    select:disabled { opacity: .5; cursor: default; }
+
+    /* ── Direction toggle ── */
+    .dir-group { display: flex; gap: 8px; }
+    .dir-btn {
+      flex: 1; padding: 9px 0;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: #fff;
+      font-size: .88rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all .15s;
+      color: var(--muted);
+    }
+    .dir-btn.active {
+      background: var(--green);
+      color: #fff;
+      border-color: var(--green);
+    }
+    .dir-btn:disabled { opacity: .4; cursor: default; }
+
+    /* ── Fetch button ── */
+    #fetch-btn {
+      width: 100%;
+      padding: 12px;
+      background: var(--green);
+      color: #fff;
+      border: none;
+      border-radius: 10px;
+      font-size: 1rem;
+      font-weight: 700;
+      cursor: pointer;
+      margin-bottom: 14px;
+      transition: background .15s;
+    }
+    #fetch-btn:hover { background: var(--green-dark); }
+    #fetch-btn:disabled { background: #9ca3af; cursor: default; }
+
+    /* ── Auto-refresh bar ── */
+    .refresh-bar {
+      display: flex; align-items: center; gap: 8px;
+      font-size: .8rem; color: var(--muted);
+      margin-bottom: 10px;
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 6px 12px;
+    }
+    .refresh-bar label { cursor: pointer; display: flex; align-items: center; gap: 5px; }
+    #countdown { margin-left: auto; font-weight: 600; color: var(--green); min-width: 2em; text-align: right; }
+
+    /* ── Mock toggle ── */
+    .mock-bar {
+      display: flex; align-items: center; gap: 6px;
+      font-size: .8rem; color: var(--muted);
+      margin-bottom: 12px;
+    }
+    .mock-bar label { cursor: pointer; display: flex; align-items: center; gap: 5px; }
+    .mock-tag {
+      background: #fef3c7;
+      border: 1px solid #fcd34d;
+      color: #92400e;
+      font-size: .7rem;
+      font-weight: 700;
+      border-radius: 4px;
+      padding: 1px 5px;
+    }
+
+    /* ── Results ── */
+    #results { }
+
+    .error-box {
+      background: #fff5f5;
+      border: 1px solid #fed7d7;
+      border-radius: 10px;
+      padding: 12px 14px;
+      color: var(--red);
+      font-size: .875rem;
+    }
+    .error-box pre { margin-top: 6px; font-size: .75rem; white-space: pre-wrap; word-break: break-all; opacity: .8; }
+    .cors-hint {
+      margin-top: 8px;
+      padding-top: 8px;
+      border-top: 1px solid #fed7d7;
+      color: #744210;
+      font-size: .78rem;
+    }
+    .cors-hint code {
+      background: #feebc8; border-radius: 3px; padding: 1px 4px; font-family: monospace;
+    }
+
+    .route-card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      margin-bottom: 12px;
+      overflow: hidden;
+    }
+    .route-header {
+      display: flex; align-items: center; gap: 10px;
+      background: var(--green-bg);
+      padding: 10px 14px;
+      border-bottom: 1px solid var(--border);
+    }
+    .route-badge {
+      background: var(--green);
+      color: #fff;
+      font-size: .78rem;
+      font-weight: 800;
+      border-radius: 6px;
+      padding: 3px 8px;
+      white-space: nowrap;
+    }
+    .route-info { flex: 1; min-width: 0; }
+    .route-name { font-weight: 700; font-size: .9rem; }
+    .route-sub { font-size: .78rem; color: var(--muted); margin-top: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .dir-tag {
+      font-size: .7rem; font-weight: 700;
+      border-radius: 99px; padding: 2px 8px;
+      white-space: nowrap;
+    }
+    .dir-tag.go  { background: #d1fae5; color: #065f46; }
+    .dir-tag.ret { background: #e0e7ff; color: #3730a3; }
+
+    .vehicle-list { }
+    .vehicle-row {
+      display: flex; align-items: center; gap: 8px;
+      padding: 9px 14px;
+      border-bottom: 1px solid var(--border);
+      font-size: .875rem;
+    }
+    .vehicle-row:last-child { border-bottom: none; }
+
+    .plate {
+      background: var(--green);
+      color: #fff;
+      font-size: .75rem;
+      font-weight: 800;
+      border-radius: 5px;
+      padding: 3px 7px;
+      font-family: monospace;
+      letter-spacing: .04em;
+      white-space: nowrap;
+    }
+    .speed-icon { font-size: .8rem; color: var(--muted); white-space: nowrap; }
+    .dist       { font-size: .82rem; color: var(--text); font-weight: 500; white-space: nowrap; }
+    .eta        { margin-left: auto; white-space: nowrap; }
+    .eta-badge  {
+      font-size: .82rem; font-weight: 800;
+      border-radius: 6px; padding: 3px 8px;
+    }
+    .eta-near   { background: #d1fae5; color: #065f46; }
+    .eta-mid    { background: #fef3c7; color: #92400e; }
+    .eta-far    { background: #f3f4f6; color: #374151; }
+
+    .no-vehicle { padding: 10px 14px; font-size: .85rem; color: var(--muted); }
+
+    .loading {
+      text-align: center; padding: 24px; color: var(--muted);
+      font-size: .9rem;
+    }
+    .spinner {
+      display: inline-block; width: 20px; height: 20px;
+      border: 3px solid var(--border);
+      border-top-color: var(--green);
+      border-radius: 50%;
+      animation: spin .7s linear infinite;
+      vertical-align: middle; margin-right: 8px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .timestamp {
+      text-align: right; font-size: .72rem;
+      color: var(--muted); margin-bottom: 6px;
+    }
+
+    .empty-state {
+      text-align: center; padding: 32px 16px;
+      color: var(--muted); font-size: .9rem;
+    }
+    .empty-state .icon { font-size: 2.4rem; margin-bottom: 8px; }
+  </style>
+</head>
+<body>
+
+<header>
+  <span style="font-size:1.4rem">🚌</span>
+  <h1>BusMap Hà Nội</h1>
+  <span class="badge">Test UI</span>
+</header>
+
+<div class="container">
+
+  <!-- ── Settings ── -->
+  <details class="settings">
+    <summary>Cấu hình API</summary>
+    <div class="settings-grid">
+      <div>
+        <label for="cfg-base">API Base URL</label>
+        <input id="cfg-base" value="https://api.busmap.vn" placeholder="https://api.busmap.vn">
+      </div>
+      <div>
+        <label for="cfg-key">API Key (nếu cần)</label>
+        <input id="cfg-key" type="password" placeholder="Bearer token">
+      </div>
+      <div>
+        <label for="cfg-routes">Endpoint danh sách tuyến</label>
+        <input id="cfg-routes" value="/api/v1/routes" placeholder="/api/v1/routes">
+      </div>
+      <div>
+        <label for="cfg-stops">Endpoint danh sách trạm</label>
+        <input id="cfg-stops" value="/api/v1/routes/{routeId}/stops" placeholder="/api/v1/routes/{routeId}/stops">
+      </div>
+      <div>
+        <label for="cfg-tracker">Endpoint tracker trạm</label>
+        <input id="cfg-tracker" value="/api/v1/trackers/route/stops/{stopId}" placeholder="/api/v1/trackers/route/stops/{stopId}">
+      </div>
+      <div></div>
+      <p class="settings-hint">
+        ⚠️ Nếu bị lỗi CORS khi mở file trực tiếp, hãy dùng CORS proxy
+        (<code>https://corsproxy.io/?</code>) hoặc bật Mock Data bên dưới để test giao diện.
+      </p>
+    </div>
+  </details>
+
+  <!-- ── Mock data toggle ── -->
+  <div class="mock-bar">
+    <label>
+      <input type="checkbox" id="mock-toggle">
+      Dùng Mock Data <span class="mock-tag">offline</span>
+    </label>
+    <span style="margin-left:auto;font-size:.75rem">
+      (dữ liệu mẫu từ trạm Mỹ Đình)
+    </span>
+  </div>
+
+  <!-- ── Step 1: Route ── -->
+  <div class="card">
+    <h2>1 · Tuyến xe</h2>
+    <select id="route-select">
+      <option value="">-- Đang tải danh sách tuyến… --</option>
+    </select>
+  </div>
+
+  <!-- ── Step 2: Direction ── -->
+  <div class="card">
+    <h2>2 · Chiều đi</h2>
+    <div class="dir-group">
+      <button class="dir-btn active" data-dir="1" id="dir-go">➡ Lượt đi</button>
+      <button class="dir-btn"        data-dir="2" id="dir-ret">⬅ Lượt về</button>
+    </div>
+  </div>
+
+  <!-- ── Step 3: Stop ── -->
+  <div class="card">
+    <h2>3 · Trạm dừng</h2>
+    <select id="stop-select" disabled>
+      <option value="">-- Chọn tuyến trước --</option>
+    </select>
+  </div>
+
+  <!-- ── Fetch ── -->
+  <button id="fetch-btn" disabled>🔍 Xem xe sắp đến</button>
+
+  <!-- ── Auto refresh ── -->
+  <div class="refresh-bar" id="refresh-bar" style="display:none">
+    <label>
+      <input type="checkbox" id="auto-refresh" checked>
+      Tự động làm mới
+    </label>
+    <select id="refresh-interval" style="width:auto;padding:3px 6px;font-size:.78rem;">
+      <option value="15">15 giây</option>
+      <option value="30" selected>30 giây</option>
+      <option value="60">1 phút</option>
+    </select>
+    <span id="countdown"></span>
+  </div>
+
+  <!-- ── Results ── -->
+  <div id="results">
+    <div class="empty-state">
+      <div class="icon">🚌</div>
+      Chọn tuyến và trạm để xem xe sắp đến
+    </div>
+  </div>
+
+</div><!-- /container -->
+
+<script>
+/* ─────────────────────────────────────────────
+   MOCK DATA  (matches the screenshot)
+───────────────────────────────────────────── */
+const MOCK_ROUTES = [
+  { id: "49",  name: "Tuyến 49",  startPoint: "Trần Khánh Dư",  endPoint: "Nhổn" },
+  { id: "50",  name: "Tuyến 50",  startPoint: "Long Biên",       endPoint: "KĐT An Lạc (Hoài Đức)" },
+  { id: "97",  name: "Tuyến 97",  startPoint: "Công viên Nghĩa Đô", endPoint: "Hoài Đức" },
+  { id: "01",  name: "Tuyến 01",  startPoint: "Bến xe Gia Lâm",  endPoint: "Bến xe Yên Nghĩa" },
+  { id: "02",  name: "Tuyến 02",  startPoint: "Bác Cổ",           endPoint: "Bến xe Yên Nghĩa" },
+  { id: "08",  name: "Tuyến 08",  startPoint: "Long Biên",        endPoint: "Hà Đông" },
+  { id: "33",  name: "Tuyến 33",  startPoint: "Long Biên",        endPoint: "Yên Nghĩa" },
+];
+
+const MOCK_STOPS = {
+  "49-1": [
+    { id: "3001", name: "Trần Khánh Dư" },
+    { id: "3002", name: "Nhà C6 KĐT Mỹ Đình I" },
+    { id: "3003", name: "Đại học Quốc gia" },
+    { id: "3004", name: "Nhổn" },
+  ],
+  "49-2": [
+    { id: "3004", name: "Nhổn" },
+    { id: "3003", name: "Đại học Quốc gia" },
+    { id: "3002", name: "Nhà C6 KĐT Mỹ Đình I" },
+    { id: "3001", name: "Trần Khánh Dư" },
+  ],
+  "50-1": [
+    { id: "4001", name: "Long Biên" },
+    { id: "4002", name: "Nhà C6 KĐT Mỹ Đình I" },
+    { id: "4003", name: "KĐT An Lạc (Hoài Đức)" },
+  ],
+  "50-2": [
+    { id: "4003", name: "KĐT An Lạc (Hoài Đức)" },
+    { id: "4002", name: "Nhà C6 KĐT Mỹ Đình I" },
+    { id: "4001", name: "Long Biên" },
+  ],
+  "97-1": [
+    { id: "5001", name: "Công viên Nghĩa Đô" },
+    { id: "5002", name: "Nhà C6 KĐT Mỹ Đình I" },
+    { id: "5003", name: "Hoài Đức" },
+  ],
+  "97-2": [
+    { id: "5003", name: "Hoài Đức" },
+    { id: "5002", name: "Nhà C6 KĐT Mỹ Đình I" },
+    { id: "5001", name: "Công viên Nghĩa Đô" },
+  ],
+};
+
+function mockTrackerData(stopId) {
+  // Returns sample tracker response resembling the screenshot
+  return {
+    data: [
+      {
+        routeId: "49", routeName: "Tuyến xe 49", direction: "lượt đi",
+        startPoint: "Trần Khánh Dư", endPoint: "Nhổn",
+        vehicles: [
+          { plateNumber: "29E-760.74", speed: 0,  distance: 1.89, etaMinutes: 2  },
+          { plateNumber: "29B-109.61", speed: 26, distance: 3.86, etaMinutes: 7  },
+          { plateNumber: "29E-786.12", speed: 34, distance: 9.14, etaMinutes: 22 },
+          { plateNumber: "29E-786.52", speed: 24, distance: 13.91, etaMinutes: 36 },
+        ]
+      },
+      {
+        routeId: "50", routeName: "Tuyến xe 50", direction: "lượt đi",
+        startPoint: "Long Biên", endPoint: "KĐT An Lạc (Hoài Đức)",
+        vehicles: [
+          { plateNumber: "29B-188.02", speed: 20, distance: 8.27,  etaMinutes: 18 },
+          { plateNumber: "29H-937.68", speed: 0,  distance: 12.28, etaMinutes: 32 },
+          { plateNumber: "29B-186.93", speed: 0,  distance: 17.31, etaMinutes: 43 },
+        ]
+      },
+      {
+        routeId: "97", routeName: "Tuyến xe 97", direction: "lượt về",
+        startPoint: "Công viên Nghĩa Đô", endPoint: "Hoài Đức",
+        vehicles: [
+          { plateNumber: "29C-524.81", speed: 30, distance: 4.5,  etaMinutes: 9  },
+          { plateNumber: "29E-312.47", speed: 0,  distance: 9.1,  etaMinutes: 21 },
+        ]
+      },
+    ]
+  };
+}
+
+/* ─────────────────────────────────────────────
+   HELPERS
+───────────────────────────────────────────── */
+function cfg(id) { return document.getElementById(id).value.trim(); }
+function isMock() { return document.getElementById("mock-toggle").checked; }
+
+function buildUrl(templateOrPath, vars = {}) {
+  let base = cfg("cfg-base").replace(/\/$/, "");
+  let path = templateOrPath;
+  for (const [k, v] of Object.entries(vars)) {
+    path = path.replace(`{${k}}`, encodeURIComponent(v));
+  }
+  // add direction as query param if needed
+  return base + path;
+}
+
+async function apiFetch(url) {
+  const headers = { "Accept": "application/json" };
+  const key = cfg("cfg-key");
+  if (key) headers["Authorization"] = `Bearer ${key}`;
+  const resp = await fetch(url, { headers });
+  if (!resp.ok) throw new Error(`HTTP ${resp.status} ${resp.statusText}`);
+  return resp.json();
+}
+
+function parseRoutes(json) {
+  const arr = json.data ?? json.result ?? json.routes ?? json.items ?? json ?? [];
+  return (Array.isArray(arr) ? arr : []).map(r => ({
+    id:         String(r.id ?? r.routeId ?? r.routeNo ?? ""),
+    name:       r.name ?? r.routeName ?? r.tenTuyen ?? `Tuyến ${r.id ?? ""}`,
+    startPoint: r.startPoint ?? r.diemDau ?? r.fromStation ?? "",
+    endPoint:   r.endPoint   ?? r.diemCuoi ?? r.toStation   ?? "",
+  }));
+}
+
+function parseStops(json) {
+  const arr = json.data ?? json.result ?? json.stops ?? json.items ?? json ?? [];
+  return (Array.isArray(arr) ? arr : []).map(s => ({
+    id:   String(s.id ?? s.stopId ?? s.tramId ?? ""),
+    name: s.name ?? s.stopName ?? s.tenTram ?? s.address ?? `Trạm ${s.id ?? ""}`,
+  }));
+}
+
+function parseTracker(json) {
+  const arr = json.data ?? json.result ?? json.routes ?? json.items ?? json ?? [];
+  return (Array.isArray(arr) ? arr : []).map(r => {
+    const dirRaw = r.direction ?? r.luot ?? r.directionName ?? "";
+    let direction;
+    if (typeof dirRaw === "number") direction = dirRaw === 1 ? "lượt đi" : "lượt về";
+    else direction = dirRaw || "lượt đi";
+
+    const vehicles = (r.vehicles ?? r.vehicleList ?? []).map(v => ({
+      plate:      v.plateNumber ?? v.plate ?? v.bienSo ?? v.licensePlate ?? "",
+      speed:      parseFloat(v.speed ?? v.tocDo ?? v.vehicleSpeed ?? 0),
+      distance:   parseFloat(v.distance ?? v.khoangCach ?? v.distanceToStop ?? 0),
+      eta:        parseInt(v.etaMinutes ?? v.timeRemaining ?? v.thoiGianConLai ?? v.time ?? 0, 10),
+    }));
+
+    return {
+      routeId:    String(r.routeId ?? r.id ?? r.routeNo ?? ""),
+      routeName:  r.routeName ?? r.name ?? r.tenTuyen ?? "",
+      direction,
+      startPoint: r.startPoint ?? r.diemDau ?? r.fromStation ?? "",
+      endPoint:   r.endPoint   ?? r.diemCuoi ?? r.toStation   ?? "",
+      vehicles,
+    };
+  });
+}
+
+/* ─────────────────────────────────────────────
+   STATE
+───────────────────────────────────────────── */
+let selectedDir    = "1";
+let refreshTimer   = null;
+let countdownTimer = null;
+let countdownSecs  = 30;
+
+/* ─────────────────────────────────────────────
+   DOM refs
+───────────────────────────────────────────── */
+const routeSel   = document.getElementById("route-select");
+const stopSel    = document.getElementById("stop-select");
+const fetchBtn   = document.getElementById("fetch-btn");
+const results    = document.getElementById("results");
+const refreshBar = document.getElementById("refresh-bar");
+const autoRefChk = document.getElementById("auto-refresh");
+const intervalSel= document.getElementById("refresh-interval");
+const countdown  = document.getElementById("countdown");
+
+/* ─────────────────────────────────────────────
+   INIT – load routes
+───────────────────────────────────────────── */
+async function loadRoutes() {
+  routeSel.innerHTML = "<option value=''>-- Đang tải… --</option>";
+  routeSel.disabled = true;
+  let routes;
+  try {
+    if (isMock()) {
+      routes = MOCK_ROUTES;
+    } else {
+      const url = buildUrl(cfg("cfg-routes"));
+      const json = await apiFetch(url);
+      routes = parseRoutes(json);
+    }
+    if (!routes.length) throw new Error("Không có tuyến nào được trả về");
+    routeSel.innerHTML = "<option value=''>-- Chọn tuyến --</option>" +
+      routes.map(r => `<option value="${r.id}" data-start="${r.startPoint}" data-end="${r.endPoint}">${r.id} · ${r.name}</option>`).join("");
+    routeSel.disabled = false;
+  } catch (err) {
+    routeSel.innerHTML = "<option value=''>❌ Lỗi tải tuyến – bật Mock Data?</option>";
+    routeSel.disabled = false;
+    console.error("loadRoutes:", err);
+  }
+}
+
+/* ─────────────────────────────────────────────
+   Load stops when route/direction changes
+───────────────────────────────────────────── */
+async function loadStops() {
+  const routeId = routeSel.value;
+  if (!routeId) {
+    stopSel.innerHTML = "<option value=''>-- Chọn tuyến trước --</option>";
+    stopSel.disabled = true;
+    fetchBtn.disabled = true;
+    return;
+  }
+  stopSel.innerHTML = "<option value=''>-- Đang tải trạm… --</option>";
+  stopSel.disabled = true;
+  fetchBtn.disabled = true;
+
+  let stops;
+  try {
+    if (isMock()) {
+      stops = MOCK_STOPS[`${routeId}-${selectedDir}`] ?? [{ id: "3002", name: "Nhà C6 KĐT Mỹ Đình I" }];
+    } else {
+      const tmpl = cfg("cfg-stops");
+      const url  = buildUrl(tmpl, { routeId }) + `?direction=${selectedDir}`;
+      const json = await apiFetch(url);
+      stops = parseStops(json);
+    }
+    if (!stops.length) throw new Error("Không có trạm nào");
+    stopSel.innerHTML = "<option value=''>-- Chọn trạm --</option>" +
+      stops.map(s => `<option value="${s.id}">${s.name}</option>`).join("");
+    stopSel.disabled = false;
+  } catch (err) {
+    stopSel.innerHTML = "<option value=''>❌ Lỗi tải trạm</option>";
+    stopSel.disabled = false;
+    console.error("loadStops:", err);
+  }
+}
+
+/* ─────────────────────────────────────────────
+   Fetch tracker & render
+───────────────────────────────────────────── */
+async function fetchTracker() {
+  const stopId   = stopSel.value;
+  const stopName = stopSel.options[stopSel.selectedIndex]?.text ?? stopId;
+  if (!stopId) return;
+
+  results.innerHTML = `<div class="loading"><span class="spinner"></span>Đang tải dữ liệu thời gian thực…</div>`;
+
+  let data;
+  try {
+    if (isMock()) {
+      data = parseTracker(mockTrackerData(stopId));
+    } else {
+      const url  = buildUrl(cfg("cfg-tracker"), { stopId });
+      const json = await apiFetch(url);
+      data = parseTracker(json);
+    }
+    renderResults(stopName, data);
+    refreshBar.style.display = "";
+    startCountdown();
+  } catch (err) {
+    renderError(err);
+  }
+}
+
+/* ─────────────────────────────────────────────
+   Render
+───────────────────────────────────────────── */
+function etaBadge(minutes) {
+  if (minutes <= 3)  return `<span class="eta-badge eta-near">🟢 ${minutes} phút</span>`;
+  if (minutes <= 10) return `<span class="eta-badge eta-mid">🟡 ${minutes} phút</span>`;
+  return `<span class="eta-badge eta-far">⚪ ${minutes} phút</span>`;
+}
+
+function renderResults(stopName, routes) {
+  const ts = new Date().toLocaleTimeString("vi-VN");
+  let html = `<div class="timestamp">Cập nhật lúc ${ts}</div>`;
+
+  if (!routes.length) {
+    html += `<div class="card"><div class="no-vehicle">Không có xe nào sắp đến trạm <strong>${stopName}</strong>.</div></div>`;
+    results.innerHTML = html;
+    return;
+  }
+
+  for (const r of routes) {
+    const dirClass  = r.direction.includes("đi") ? "go" : "ret";
+    const routeNum  = r.routeId || r.routeName.replace(/[^\d]/g, "");
+    const subtext   = r.startPoint && r.endPoint ? `${r.startPoint} → ${r.endPoint}` : "";
+
+    html += `
+    <div class="route-card">
+      <div class="route-header">
+        <span class="route-badge">🚌 ${routeNum}</span>
+        <div class="route-info">
+          <div class="route-name">${r.routeName}</div>
+          ${subtext ? `<div class="route-sub">${subtext}</div>` : ""}
+        </div>
+        <span class="dir-tag ${dirClass}">${r.direction}</span>
+      </div>
+      <div class="vehicle-list">`;
+
+    if (!r.vehicles.length) {
+      html += `<div class="no-vehicle">Không có xe nào</div>`;
+    } else {
+      for (const v of r.vehicles) {
+        const dist = v.distance.toFixed(2).replace(/\.?0+$/, "");
+        html += `
+        <div class="vehicle-row">
+          <span class="plate">${v.plate}</span>
+          <span class="speed-icon">🚀 ${Math.round(v.speed)} km/h</span>
+          <span class="dist">📍 ${dist} km</span>
+          <span class="eta">${etaBadge(v.eta)}</span>
+        </div>`;
+      }
+    }
+    html += `</div></div>`;
+  }
+
+  results.innerHTML = html;
+}
+
+function renderError(err) {
+  const isCors = err.message.includes("Failed to fetch") || err.message.includes("NetworkError");
+  results.innerHTML = `
+  <div class="error-box">
+    <strong>❌ Không thể lấy dữ liệu</strong>
+    <pre>${err.message}</pre>
+    ${isCors ? `
+    <div class="cors-hint">
+      <strong>Có thể bị lỗi CORS.</strong> Thử một trong các cách sau:<br>
+      • Bật <strong>Mock Data</strong> ở trên để test giao diện offline.<br>
+      • Mở file qua local server: <code>python -m http.server 8080</code> rồi vào <code>localhost:8080</code>.<br>
+      • Thêm CORS proxy vào API Base URL, ví dụ: <code>https://corsproxy.io/?https://api.busmap.vn</code>
+    </div>` : ""}
+  </div>`;
+  refreshBar.style.display = "none";
+  stopCountdown();
+}
+
+/* ─────────────────────────────────────────────
+   Auto-refresh countdown
+───────────────────────────────────────────── */
+function startCountdown() {
+  stopCountdown();
+  if (!autoRefChk.checked) return;
+  countdownSecs = parseInt(intervalSel.value, 10);
+  countdown.textContent = countdownSecs + "s";
+  countdownTimer = setInterval(() => {
+    countdownSecs--;
+    countdown.textContent = countdownSecs + "s";
+    if (countdownSecs <= 0) { fetchTracker(); }
+  }, 1000);
+}
+
+function stopCountdown() {
+  if (countdownTimer) { clearInterval(countdownTimer); countdownTimer = null; }
+  countdown.textContent = "";
+}
+
+/* ─────────────────────────────────────────────
+   EVENT LISTENERS
+───────────────────────────────────────────── */
+document.getElementById("mock-toggle").addEventListener("change", () => {
+  loadRoutes();
+  stopSel.innerHTML = "<option value=''>-- Chọn tuyến trước --</option>";
+  stopSel.disabled = true;
+  fetchBtn.disabled = true;
+  results.innerHTML = `<div class="empty-state"><div class="icon">🚌</div>Chọn tuyến và trạm để xem xe sắp đến</div>`;
+});
+
+routeSel.addEventListener("change", loadStops);
+
+document.querySelectorAll(".dir-btn").forEach(btn => {
+  btn.addEventListener("click", () => {
+    document.querySelectorAll(".dir-btn").forEach(b => b.classList.remove("active"));
+    btn.classList.add("active");
+    selectedDir = btn.dataset.dir;
+    if (routeSel.value) loadStops();
+  });
+});
+
+stopSel.addEventListener("change", () => {
+  fetchBtn.disabled = !stopSel.value;
+});
+
+fetchBtn.addEventListener("click", fetchTracker);
+
+autoRefChk.addEventListener("change", () => {
+  if (autoRefChk.checked) startCountdown();
+  else stopCountdown();
+});
+
+intervalSel.addEventListener("change", () => {
+  if (autoRefChk.checked) startCountdown();
+});
+
+/* ─────────────────────────────────────────────
+   BOOT
+───────────────────────────────────────────── */
+loadRoutes();
+</script>
+</body>
+</html>
